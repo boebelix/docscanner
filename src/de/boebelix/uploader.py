@@ -5,6 +5,8 @@ import subprocess
 from abc import ABC, abstractmethod
 from pathlib import Path
 
+from .config import ScanConfig
+
 
 class Uploader(ABC):
     """Abstract base class for upload targets."""
@@ -66,3 +68,53 @@ class SmbUploader(Uploader):
         logging.info("Moving %d file(s) to SMB share %s ...", len(files), self.mount_point)
         for file in files:
             shutil.move(str(file), self.mount_point / file.name)
+
+
+class MultiUploader(Uploader):
+    """Runs multiple uploaders in sequence. Each failure is logged but does not stop the others."""
+
+    def __init__(self, uploaders: list[Uploader]) -> None:
+        self.uploaders = uploaders
+
+    def upload(self, source_dir: Path) -> None:
+        for uploader in self.uploaders:
+            try:
+                uploader.upload(source_dir)
+            except Exception as e:
+                logging.error("Uploader %s failed: %s", type(uploader).__name__, e)
+
+
+_FACTORIES = {
+    "nfs": lambda config: NfsUploader(config.remote_share),
+    "smb": lambda config: SmbUploader(config.remote_share),
+    "rsync": lambda config: RsyncUploader(config.rsync_target),
+}
+
+
+def create_uploader(config: ScanConfig) -> Uploader | None:
+    """Creates uploaders based on SCAN_UPLOADER.
+
+    Accepts a single value or a comma-separated list: nfs, smb, rsync, none.
+    Multiple values are wrapped in a MultiUploader.
+    Raises ValueError for unknown types.
+    """
+    types = [t.strip().lower() for t in config.uploader_type.split(",") if t.strip()]
+
+    if not types or types == ["none"]:
+        return None
+
+    uploaders = []
+    for t in types:
+        if t == "none":
+            continue
+        factory = _FACTORIES.get(t)
+        if factory is None:
+            raise ValueError(
+                "Unknown uploader %r in SCAN_UPLOADER — valid values: %s"
+                % (t, ", ".join([*_FACTORIES, "none"]))
+            )
+        uploaders.append(factory(config))
+
+    if len(uploaders) == 1:
+        return uploaders[0]
+    return MultiUploader(uploaders)

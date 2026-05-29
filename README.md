@@ -155,34 +155,74 @@ SCAN_BUTTON=scan
 
 ## Upload targets
 
-The uploader is configured in `src/de/boebelix/main.py`:
+The uploader is configured entirely via `.env` — no code changes required.
 
-Set the mount point in `.env` or directly in `config.py`:
+| Variable            | Default | Description                                      |
+|---------------------|---------|--------------------------------------------------|
+| `SCAN_UPLOADER`     | `nfs`   | Uploader type: `nfs`, `smb`, `rsync`, `none`     |
+| `SCAN_REMOTE_SHARE` | `/mnt/scans` | Mount point for NFS or SMB              |
+| `SCAN_RSYNC_TARGET` | —       | Rsync target URI, e.g. `user@host:/path`         |
+
+### Single uploader
 
 ```bash
-# .env
-SCAN_REMOTE_SHARE=/mnt/scans
-```
+# NFS — share must be mounted at SCAN_REMOTE_SHARE
+# /etc/fstab: 192.168.1.10:/scans /mnt/nas/scans nfs defaults 0 0
+SCAN_UPLOADER=nfs
+SCAN_REMOTE_SHARE=/mnt/nas/scans
 
-Then choose the uploader in `src/de/boebelix/main.py`:
+# SMB/CIFS — share must be mounted at SCAN_REMOTE_SHARE
+# /etc/fstab: //192.168.1.10/scans /mnt/nas/scans cifs credentials=/etc/samba/creds 0 0
+SCAN_UPLOADER=smb
+SCAN_REMOTE_SHARE=/mnt/nas/scans
 
-```python
-# NFS mount (default) — mount point from config.remote_share
-# e.g. SCAN_REMOTE_SHARE=/mnt/nas/scans  (via /etc/fstab: 192.168.1.10:/scans /mnt/nas/scans nfs defaults 0 0)
-uploader = NfsUploader(config.remote_share)
-
-# SMB/CIFS mount — mount point from config.remote_share
-# e.g. SCAN_REMOTE_SHARE=/mnt/nas/scans  (via /etc/fstab: //192.168.1.10/scans /mnt/nas/scans cifs credentials=/etc/samba/creds 0 0)
-uploader = SmbUploader(config.remote_share)
-
-# Rsync over SSH — independent of config.remote_share
-uploader = RsyncUploader("user@nas:/path/to/scans")
+# Rsync over SSH
+SCAN_UPLOADER=rsync
+SCAN_RSYNC_TARGET=user@nas:/scans
 
 # No upload
-uploader = None
+SCAN_UPLOADER=none
+```
+
+### Multiple uploaders
+
+`SCAN_UPLOADER` accepts a comma-separated list. All configured uploaders run in sequence — if one fails, the others still run.
+
+```bash
+# NFS + Rsync as backup
+SCAN_UPLOADER=nfs,rsync
+SCAN_REMOTE_SHARE=/mnt/nas/scans
+SCAN_RSYNC_TARGET=user@backup:/scans
+
+# All three
+SCAN_UPLOADER=nfs,smb,rsync
 ```
 
 NFS and SMB uploaders skip silently if the mount point is not active.
+
+### Rsync — SSH key setup
+
+Rsync over SSH requires passwordless authentication so the daemon can upload without user interaction. Set up a key pair once:
+
+```bash
+# Generate key (no passphrase)
+ssh-keygen -t ed25519 -f ~/.ssh/docscanner_rsa -N ""
+
+# Copy public key to target host
+ssh-copy-id -i ~/.ssh/docscanner_rsa.pub user@nas
+```
+
+Then tell SSH to use that key for the target host in `~/.ssh/config`:
+
+```
+Host nas
+    HostName 192.168.1.10
+    User user
+    IdentityFile ~/.ssh/docscanner_rsa
+    IdentitiesOnly yes
+```
+
+After that `SCAN_RSYNC_TARGET=user@nas:/scans` works without any password prompt.
 
 ---
 
