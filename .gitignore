@@ -218,5 +218,7 @@ tmp/
 AppDir/
 dist/
 docscanner-*.AppImage
+linuxdeploy-*.AppImage
 build/linuxdeploy-*.AppImage
+build/docscanner/
 build/docscanner.spec
