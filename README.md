@@ -6,6 +6,21 @@ Daemon that listens for a button press on a Fujitsu fi-series scanner and automa
 
 ---
 
+## Table of contents
+
+- [Scanner](#scanner)
+- [Workflow](#workflow)
+- [Design decisions](#design-decisions)
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Upload targets](#upload-targets)
+- [Usage](#usage)
+- [Run as a systemd service](#run-as-a-systemd-service)
+- [Project structure](#project-structure)
+
+---
+
 ## Scanner
 
 ```
