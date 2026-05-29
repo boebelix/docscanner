@@ -1,0 +1,4 @@
+#!/bin/sh
+export LD_LIBRARY_PATH="$APPDIR/usr/lib/sane:$LD_LIBRARY_PATH"
+export SANE_CONFIG_DIR="$APPDIR/etc/sane.d"
+exec "$APPDIR/usr/bin/docscanner" "$@"

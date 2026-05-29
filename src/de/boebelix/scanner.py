@@ -5,6 +5,8 @@ import time
 from concurrent.futures import ProcessPoolExecutor
 from pathlib import Path
 
+import img2pdf
+
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
@@ -97,6 +99,7 @@ class Orchestrator:
 
         if files:
             logging.info("Creating PDF: %s", pdf_path.name)
-            subprocess.run(["img2pdf", *files, "-o", str(pdf_path)], check=True)
+            with open(pdf_path, "wb") as f:
+                f.write(img2pdf.convert(files))
             if self.uploader:
                 self.uploader.upload(self.config.queue_dir)

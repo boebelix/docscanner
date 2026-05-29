@@ -1,4 +1,5 @@
 import logging
+import os
 
 from dotenv import load_dotenv
 
@@ -9,8 +10,10 @@ from .uploader import create_uploader
 
 
 def main() -> None:
-    load_dotenv()
+    load_dotenv(dotenv_path=os.getenv("DOTENV_PATH"))
     config = ScanConfig()
+    config.log_file.parent.mkdir(parents=True, exist_ok=True)
+    config.queue_dir.mkdir(parents=True, exist_ok=True)
 
     logging.basicConfig(
         level=logging.INFO,
