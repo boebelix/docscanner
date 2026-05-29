@@ -104,7 +104,7 @@ sudo apt install sane-utils img2pdf rsync libmagickwand-dev
 ## Installation
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/boebelix/docscanner.git
 cd docscanner
 uv sync
 ```
