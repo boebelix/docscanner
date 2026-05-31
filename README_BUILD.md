@@ -47,6 +47,7 @@ The script checks for all of these and exits with a clear message if anything is
 | `wget` | Download linuxdeploy on first run | `apt install wget` / `pacman -S wget` |
 | `pyinstaller` | Bundle Python into a single binary | `uv add --dev pyinstaller` |
 | `libsane-fujitsu.so` | Copied into AppImage for scanner backend | `apt install sane-utils` / `pacman -S sane` |
+| `libsane-dev` | Provides SANE headers needed to build `python-sane` | `apt install libsane-dev` |
 | `libMagickWand.so` | Bundled by linuxdeploy for image optimization | `apt install libmagickwand-dev` / `pacman -S imagemagick` |
 | `magick` / `convert` | Resize icon to 256x256 for AppImage | included with ImageMagick |
 
@@ -75,6 +76,54 @@ docscanner-aarch64.AppImage   ← on Raspberry Pi (aarch64)
 ```
 
 The AppImage is placed in the project root directory.
+
+---
+
+## Running the AppImage
+
+The resulting AppImage is a self-contained executable and can be run like any other binary.
+
+### Start in the background
+
+```bash
+./docscanner-aarch64.AppImage &
+```
+
+For a cleaner detached run:
+
+```bash
+nohup ./docscanner-aarch64.AppImage > /var/log/docscanner.log 2>&1 &
+```
+
+Use the full absolute path when running from systemd or another startup mechanism.
+
+### Run at system startup
+
+Create a systemd service unit such as `/etc/systemd/system/docscanner.service`:
+
+```ini
+[Unit]
+Description=docscanner AppImage Daemon
+After=network.target
+
+[Service]
+ExecStart=/home/boebelix/docscanner/docscanner-aarch64.AppImage
+WorkingDirectory=/home/boebelix/docscanner
+Restart=on-failure
+User=boebelix
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then enable and start it:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable --now docscanner.service
+```
+
+Use `sudo systemctl status docscanner.service` to verify the service state.
 
 ---
 

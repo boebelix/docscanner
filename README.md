@@ -166,6 +166,24 @@ The SANE option name is the lowercase version without spaces — `scan` or `emai
 SCAN_BUTTON=scan
 ```
 
+### USB permissions for local scanners
+
+Some scanners are only visible to root unless your user has permission to access the USB device. Debian/Ubuntu systems normally create a `scanner` group for this purpose.
+
+If `scanimage -L` only lists the scanner as root, add your user to the group and then log out/in:
+
+```bash
+sudo adduser $USER scanner
+```
+
+After that, check again with:
+
+```bash
+scanimage -L
+```
+
+If the Fujitsu scanner appears, update `.env` with the reported device ID and rerun the app.
+
 ---
 
 ## Upload targets
