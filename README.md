@@ -18,6 +18,7 @@ Daemon that listens for a button press on a Fujitsu fi-series scanner and automa
 - [Usage](#usage)
 - [Run as a systemd service](#run-as-a-systemd-service)
 - [Project structure](#project-structure)
+- [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -51,10 +52,11 @@ Daemon that listens for a button press on a Fujitsu fi-series scanner and automa
   │  on scanner │────────────────────────────────────┐
   └─────────────┘                                    │
                                                      ▼
-                                          ┌─────────────────────┐
-                                          │   ButtonMonitor      │
-                                          │   polls every 1s    │
-                                          └────────┬────────────┘
+                                          ┌──────────────────────┐
+                                          │   ButtonMonitor       │
+                                          │   polls every 1s      │
+                                          │   (device held open)  │
+                                          └────────┬─────────────┘
                                                    │ on_press()
                                                    ▼
                                           ┌─────────────────────┐
@@ -316,4 +318,44 @@ src/de/boebelix/
 ├── image.py         # process_image – deskew / level / threshold
 ├── uploader.py      # Uploader base class + NFS / SMB / Rsync implementations
 └── main.py          # Entry point – wires everything together
+```
+
+---
+
+## Troubleshooting
+
+### `Error during device I/O` / `Invalid argument` logged every second
+
+**Symptom:** The daemon logs `Error: Error during device I/O` or `Error: Invalid argument`
+repeatedly at 1-second intervals, and the scan button is no longer detected.
+
+**Root cause:** After a scan (or after extended idle time), the SANE/USB connection to the
+scanner enters an error state. The original implementation opened and closed the device on
+every poll cycle (once per second). This constant USB churn gradually destabilised the
+connection, and once it failed, each `sane.open()` call failed immediately without any
+recovery path.
+
+**Fix (implemented in `button.py`):**
+
+- The SANE device is now opened **once** and kept open across all polls. This reduces USB
+  traffic by ~⅔ and prevents the churn that triggered the instability.
+- If a poll raises an error (I/O error, invalid argument, etc.), the device is closed and
+  reopened on the next iteration.
+- Each consecutive error doubles the retry delay (exponential backoff, capped at 60 s), so
+  a stuck device no longer floods the log.
+- After 10 consecutive errors, SANE is fully re-initialised (`sane.exit()` + `sane.init()`)
+  to recover from deeper state corruption.
+
+**If the problem persists after a service restart**, the scanner's USB connection may need a
+physical reset: power-cycle the scanner or unplug/replug its USB cable.
+
+---
+
+### Scanner not found by `scanimage -L`
+
+Ensure your user is in the `scanner` group:
+
+```bash
+sudo adduser $USER scanner
+# then log out and back in
 ```

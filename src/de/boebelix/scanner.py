@@ -58,30 +58,32 @@ class Orchestrator:
                 observer.schedule(handler, str(self.config.temp_dir), recursive=False)
                 observer.start()
 
-                logging.info("Hardware scan starting...")
-                subprocess.run(
-                    [
-                        "scanimage",
-                        "--device", self.config.device_id,
-                        "--source", "ADF Duplex",
-                        "--mode", "Color",
-                        "--resolution", "600",
-                        "--page-width", "210",
-                        "--page-height", "297",
-                        "--brightness", "20",
-                        "--contrast", "10",
-                        "--format=jpeg",
-                        f"--batch={self.config.temp_dir}/page%03d.jpg",
-                    ],
-                    check=True,
-                )
+                try:  # finally ensures observer is stopped even if scanimage fails
+                    logging.info("Hardware scan starting...")
+                    subprocess.run(
+                        [
+                            "scanimage",
+                            "--device", self.config.device_id,
+                            "--source", "ADF Duplex",
+                            "--mode", "Color",
+                            "--resolution", "600",
+                            "--page-width", "210",
+                            "--page-height", "297",
+                            "--brightness", "20",
+                            "--contrast", "10",
+                            "--format=jpeg",
+                            f"--batch={self.config.temp_dir}/page%03d.jpg",
+                        ],
+                        check=True,
+                    )
 
-                while any(not f.done() for f in handler.futures):
-                    time.sleep(0.5)
+                    while any(not f.done() for f in handler.futures):
+                        time.sleep(0.5)
 
-                observer.stop()
-                observer.join()
-                self._finalize(timestamp)
+                    self._finalize(timestamp)
+                finally:
+                    observer.stop()
+                    observer.join()
 
         except subprocess.CalledProcessError as e:
             if e.returncode in (-2, 130):
