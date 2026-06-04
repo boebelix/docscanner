@@ -8,6 +8,15 @@ from pathlib import Path
 from .config import ScanConfig
 
 
+def _is_mounted(path: Path) -> bool:
+    """Return True if path or any of its parents is a mount point and the path exists."""
+    p = path.resolve() if path.exists() else path
+    for candidate in [p, *p.parents]:
+        if os.path.ismount(candidate):
+            return True
+    return False
+
+
 class Uploader(ABC):
     """Abstract base class for upload targets."""
 
@@ -44,7 +53,7 @@ class NfsUploader(Uploader):
         files = list(source_dir.glob("*.pdf"))
         if not files:
             return
-        if not os.path.ismount(self.mount_point):
+        if not _is_mounted(self.mount_point):
             logging.warning("NFS mount %s is not active, skipping upload.", self.mount_point)
             return
         logging.info("Moving %d file(s) to NFS share %s ...", len(files), self.mount_point)
@@ -62,7 +71,7 @@ class SmbUploader(Uploader):
         files = list(source_dir.glob("*.pdf"))
         if not files:
             return
-        if not os.path.ismount(self.mount_point):
+        if not _is_mounted(self.mount_point):
             logging.warning("SMB mount %s is not active, skipping upload.", self.mount_point)
             return
         logging.info("Moving %d file(s) to SMB share %s ...", len(files), self.mount_point)
