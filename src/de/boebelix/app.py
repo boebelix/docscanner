@@ -1,10 +1,12 @@
 import logging
 import os
+import threading
 
 from dotenv import load_dotenv
 
 from .button import ButtonMonitor
 from .config import ScanConfig
+from .consume_sync import ConsumeSync
 from .scanner import Orchestrator
 from .uploader import create_uploader
 
@@ -23,6 +25,9 @@ def main() -> None:
             logging.StreamHandler(),
         ],
     )
+
+    sync_thread = threading.Thread(target=ConsumeSync(config).run, daemon=True, name="consume-sync")
+    sync_thread.start()
 
     uploader = create_uploader(config)
     orchestrator = Orchestrator(config, uploader)
