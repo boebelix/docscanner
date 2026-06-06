@@ -18,5 +18,7 @@ class ScanConfig:
     button_option: str = field(default_factory=lambda: os.getenv("SCAN_BUTTON", "scan"))
     uploader_type: str = field(default_factory=lambda: os.getenv("SCAN_UPLOADER", "nfs"))
     rsync_target: str = field(default_factory=lambda: os.getenv("SCAN_RSYNC_TARGET", ""))
+    consume_dir: Path = field(default_factory=lambda: Path(os.getenv("SCAN_CONSUME_DIR", "/mnt/paperless/consume")))
+    sync_interval_s: int = field(default_factory=lambda: int(os.getenv("SCAN_SYNC_INTERVAL", "30")))
     poll_interval_s: float = 1.0
     upload_check_interval_s: int = 300
