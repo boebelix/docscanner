@@ -1,5 +1,6 @@
 import logging
 import signal
+import sys
 import time
 from typing import Callable
 
@@ -8,7 +9,7 @@ import sane
 from .config import ScanConfig
 from .uploader import Uploader
 
-_SANE_REINIT_THRESHOLD = 10  # reinit SANE after this many consecutive poll errors
+_SANE_REINIT_THRESHOLD = 10  # exit after this many consecutive poll errors, let systemd restart us
 _MAX_BACKOFF_S = 60.0        # maximum retry interval after repeated failures
 
 
@@ -18,7 +19,13 @@ class ButtonMonitor:
     The SANE device is opened once and kept open across polls to minimise USB churn.
     On error the device is closed and reopened next iteration. Consecutive errors trigger
     exponential backoff (up to _MAX_BACKOFF_S) and, after _SANE_REINIT_THRESHOLD failures,
-    a full SANE reinit.
+    the process exits so systemd (Restart=on-failure) can restart it with a clean state.
+
+    A prior version called sane.exit()/sane.init() in-process to recover instead of
+    exiting. That leaked a libusb eventfd/timerfd pair per reinit (never released by
+    sane.exit()), which after enough reinit cycles hit the process's open-files limit
+    and wedged the daemon entirely, undetected, until systemd's stop timeout SIGKILLed
+    it. Exiting the process avoids the leak by starting from a fresh fd table each time.
     """
 
     def __init__(
@@ -109,16 +116,11 @@ class ButtonMonitor:
                     backoff = min(backoff * 2, _MAX_BACKOFF_S)
 
                     if consec_errors >= _SANE_REINIT_THRESHOLD:
-                        logging.warning("Reinitializing SANE after %d consecutive errors", consec_errors)
-                        try:
-                            sane.exit()
-                        except Exception:
-                            pass
-                        try:
-                            sane.init()
-                        except Exception as reinit_err:
-                            logging.error("SANE reinit failed: %s", reinit_err)
-                        consec_errors = 0
+                        logging.error(
+                            "Giving up after %d consecutive errors, exiting for systemd to restart us",
+                            consec_errors,
+                        )
+                        sys.exit(1)
 
                 time.sleep(backoff)
         finally:
